@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voucher Parser</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+            max-width: 900px;
+            margin: 2rem auto;
+            padding: 1rem;
+            background: #f5f7fb;
+        }
+        .container {
+            background: white;
+            border-radius: 1rem;
+            padding: 1.5rem;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        h1 {
+            margin-top: 0;
+            color: #1e293b;
+        }
+        label {
+            font-weight: 600;
+            display: block;
+            margin-bottom: 0.5rem;
+            color: #0f172a;
+        }
+        textarea {
+            width: 100%;
+            padding: 0.75rem;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            border: 1px solid #cbd5e1;
+            border-radius: 0.5rem;
+            resize: vertical;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #3b82f6;
+            color: white;
+            border: none;
+            padding: 0.6rem 1.2rem;
+            font-size: 1rem;
+            font-weight: 500;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            margin-top: 1rem;
+            transition: background 0.2s;
+        }
+        button:hover {
+            background-color: #2563eb;
+        }
+        button:disabled {
+            background-color: #94a3b8;
+            cursor: not-allowed;
+        }
+        .output {
+            margin-top: 1.5rem;
+        }
+        .output pre {
+            background: #1e293b;
+            color: #e2e8f0;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            overflow-x: auto;
+            font-size: 0.85rem;
+            font-family: 'Courier New', monospace;
+        }
+        .error {
+            color: #b91c1c;
+            background: #fee2e2;
+            padding: 0.75rem;
+            border-radius: 0.5rem;
+            border-left: 4px solid #dc2626;
+        }
+        .status {
+            font-size: 0.85rem;
+            color: #475569;
+            margin-top: 0.5rem;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>📝 Voucher Message Parser</h1>
+    <p>Paste the voucher message as shared from Google Pay / any source.</p>
+
+    <label for="message">Voucher text:</label>
+    <textarea id="message" rows="8" placeholder="Example:
+Hey, I thought you may like this AGEasy voucher on Google Pay!
+BP Monitor @₹899
+by AGEasy worth ₹1499
+Expiring in 9 days
+https://ageasy.co.in/products/one-touch-digital-bp-monitor-by-ageasy?utm_source=Paid&utm_medium=Partnerships_Gpay&utm_campaign=Gpay_899_March&utm_discount=899&utm_coupon_code=MAR899
+
+Voucher code: MAR899"></textarea>
+
+    <button id="parseBtn">🔍 Parse Voucher</button>
+    
+    <div class="output">
+        <label>📤 JSON Output:</label>
+        <pre id="jsonOutput">{
+  "rawCouponCode": null,
+  "description": "...",
+  "expiryDate": null,
+  "issueDate": null,
+  "price": null,
+  "sellerWallet": "0xYourSellerWalletAddress"
+}</pre>
+        <div id="errorMsg" class="error" style="display: none;"></div>
+        <div id="status" class="status"></div>
+    </div>
+</div>
+
+<script>
+    const API_URL = 'http://localhost:3001/parse-voucher';   // <-- updated port
+    const parseBtn = document.getElementById('parseBtn');
+    const messageInput = document.getElementById('message');
+    const jsonOutput = document.getElementById('jsonOutput');
+    const errorDiv = document.getElementById('errorMsg');
+    const statusDiv = document.getElementById('status');
+
+    parseBtn.addEventListener('click', async () => {
+        const text = messageInput.value.trim();
+        if (!text) {
+            showError('Please paste a voucher message.');
+            return;
+        }
+
+        parseBtn.disabled = true;
+        parseBtn.textContent = '⏳ Parsing...';
+        hideError();
+        statusDiv.textContent = 'Sending request to backend...';
+
+        try {
+            const response = await fetch(API_URL, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ text: text })
+            });
+
+            statusDiv.textContent = `Response status: ${response.status}`;
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || `Server error (${response.status})`);
+            }
+
+            const data = await response.json();
+            jsonOutput.textContent = JSON.stringify(data, null, 2);
+            statusDiv.textContent = '✓ Parsing successful';
+        } catch (err) {
+            console.error('Fetch error:', err);
+            showError(err.message);
+            jsonOutput.textContent = 'Error: ' + err.message;
+            statusDiv.textContent = '✗ Request failed';
+        } finally {
+            parseBtn.disabled = false;
+            parseBtn.textContent = '🔍 Parse Voucher';
+        }
+    });
+
+    function showError(msg) {
+        errorDiv.textContent = msg;
+        errorDiv.style.display = 'block';
+    }
+
+    function hideError() {
+        errorDiv.style.display = 'none';
+        errorDiv.textContent = '';
+    }
+</script>
+</body>
+</html>
